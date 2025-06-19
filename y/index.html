@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemeinsame Einkaufsliste</title>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <!-- Firebase Konfiguration -->
+  <script src="firebase-config.js"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      background: #f8f8f8;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    form {
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    input, select, button {
+      padding: 0.6rem;
+      font-size: 1rem;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    li {
+      background: white;
+      margin: 0.4rem 0;
+      padding: 0.6rem;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #ccc;
+    }
+
+    li.checked span {
+      text-decoration: line-through;
+      color: gray;
+    }
+
+    h2 {
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <button id="loginBtn">🔐 Mit Google anmelden</button>
+
+  <h1>🛒 Gemeinsame Einkaufsliste</h1>
+
+  <form id="itemForm">
+    <input type="text" id="itemInput" placeholder="Produkt eingeben" required />
+    <select id="itemCategory" required>
+      <option value="" disabled selected>Kategorie wählen</option>
+      <option value="Obst">Obst</option>
+      <option value="Getränke">Getränke</option>
+      <option value="Haushalt">Haushalt</option>
+      <option value="Snacks">Snacks</option>
+      <option value="Tiefkühl">Tiefkühl</option>
+      <option value="Tabakwaren">Tabakwaren</option>
+      <option value="Sonstiges">Sonstiges</option>
+    </select>
+    <button type="submit">➕ Hinzufügen</button>
+  </form>
+
+  <button id="clearAllBtn">🧹 Alle löschen</button>
+
+  <div id="itemList"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

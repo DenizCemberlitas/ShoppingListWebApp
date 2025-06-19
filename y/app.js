@@ -1,85 +1,114 @@
 document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const userInfo = document.getElementById("userInfo");
   const form = document.getElementById("itemForm");
   const input = document.getElementById("itemInput");
   const categorySelect = document.getElementById("itemCategory");
   const list = document.getElementById("itemList");
   const clearBtn = document.getElementById("clearAllBtn");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebar = document.getElementById("sidebar");
+
+sidebarToggle.addEventListener("click", () => {
+  sidebar.classList.toggle("active");
+});
 
   let items = [];
+  let initialized = false;
+  let firestoreListRef = null;
 
+  // 🔁 Auth-Zustand prüfen
   firebase.auth().onAuthStateChanged(user => {
-  if (user) {
-    loginBtn.style.display = "none";
-    initSharedList();
-  } else {
-    loginBtn.style.display = "inline-block";
-  }
-});
+    initialized = false;
 
-
-  loginBtn.addEventListener("click", () => {
-  const provider = new firebase.auth.GoogleAuthProvider();
-
-  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-    .then(() => {
-      return firebase.auth().signInWithPopup(provider);
-    })
-    .then((result) => {
+    if (user) {
       loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      userInfo.textContent = `👤 Eingeloggt als: ${user.displayName || user.email}`;
       initSharedList();
-    })
-    .catch((error) => {
-      console.error("Login fehlgeschlagen:", error);
-      alert("Login fehlgeschlagen: " + error.message);
-    });
-});
+    } else {
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
+      userInfo.textContent = "";
+      list.innerHTML = "";
+    }
+  });
 
+  // 🔐 Login mit Google
+  loginBtn.addEventListener("click", () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
 
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+      .then(() => firebase.auth().signInWithPopup(provider))
+      .catch((error) => {
+        console.error("Login fehlgeschlagen:", error);
+        alert("Login fehlgeschlagen: " + error.message);
+      });
+  });
+
+  // 🚪 Logout
+  logoutBtn.addEventListener("click", () => {
+    firebase.auth().signOut()
+      .then(() => {
+        list.innerHTML = "";
+      })
+      .catch((error) => {
+        console.error("Fehler beim Logout:", error);
+      });
+  });
+
+  // 📥 Formularverhalten
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    const category = categorySelect.value;
+
+    if (text && category && firestoreListRef) {
+      firestoreListRef.add({
+        text,
+        category,
+        checked: false,
+        timestamp: Date.now()
+      });
+      input.value = "";
+      categorySelect.value = "";
+    }
+  });
+
+  // 🗑️ Alles löschen
+  clearBtn.addEventListener("click", () => {
+    if (firestoreListRef && confirm("Wirklich alles löschen?")) {
+      items.forEach(item => {
+        firestoreListRef.doc(item.id).delete();
+      });
+    }
+  });
+
+  // 📡 Firestore-Daten laden
   function initSharedList() {
-    const listRef = firebase.firestore()
+    if (initialized) return;
+    initialized = true;
+
+    firestoreListRef = firebase.firestore()
       .collection("lists")
       .doc("familie")
       .collection("items");
 
-    // Echtzeit-Updates
-    listRef.orderBy("timestamp").onSnapshot(snapshot => {
+    firestoreListRef.orderBy("timestamp").onSnapshot(snapshot => {
       items = [];
+
       snapshot.forEach(doc => {
         items.push({ ...doc.data(), id: doc.id });
       });
-      renderItems(listRef);
-    });
 
-    // Hinzufügen
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const text = input.value.trim();
-      const category = categorySelect.value;
-
-      if (text && category) {
-        listRef.add({
-          text,
-          category,
-          checked: false,
-          timestamp: Date.now()
-        });
-        input.value = "";
-        categorySelect.value = "";
-      }
-    });
-
-    // Alle löschen
-    clearBtn.addEventListener("click", () => {
-      if (confirm("Wirklich alles löschen?")) {
-        items.forEach(item => {
-          listRef.doc(item.id).delete();
-        });
-      }
+      console.log("📦 Geladene Items:", items);
+      renderItems();
     });
   }
 
-  function renderItems(listRef) {
+  // 🖼️ Liste anzeigen
+  function renderItems() {
     list.innerHTML = "";
 
     const grouped = {};
@@ -102,14 +131,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const span = document.createElement("span");
         span.textContent = item.text;
         span.addEventListener("click", () => {
-          listRef.doc(item.id).update({ checked: !item.checked });
+          firestoreListRef.doc(item.id).update({ checked: !item.checked });
         });
 
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "❌";
         deleteBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          listRef.doc(item.id).delete();
+          firestoreListRef.doc(item.id).delete();
         });
 
         li.appendChild(span);
@@ -121,6 +150,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  document.addEventListener("click", (e) => {
+  if (
+    sidebar.classList.contains("active") &&
+    !sidebar.contains(e.target) &&
+    e.target !== sidebarToggle
+  ) {
+    sidebar.classList.remove("active");
+  }
+});
+
+
+  // 🧠 Emoji je Kategorie
   function getCategoryEmoji(category) {
     switch (category) {
       case "Obst": return "🍎";

@@ -1,276 +1,59 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gemeinsame Einkaufsliste</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sidebar" id="sidebar">
+    <div id="userInfo"></div>
+    <button id="loginBtn">🔒 Mit Google anmelden</button>
+    <button id="logoutBtn" style="display: none;">🚪 Logout</button>
+  </div>
 
-  <!-- Firebase SDKs -->
+  <div class="content">
+    <header>
+      <button id="toggleSidebar">☰</button>
+      <h1>🛒 Gemeinsame Einkaufsliste</h1>
+    </header>
+
+    <form id="itemForm">
+      <input id="itemInput" type="text" placeholder="Produkt eingeben" required>
+      <select id="itemCategory" required>
+        <option value="" disabled selected>Kategorie wählen</option>
+        <option value="Getränke">Getränke</option>
+        <option value="Snacks">Snacks</option>
+        <option value="Tabakwaren">Tabakwaren</option>
+        <option value="Tabak Zubehör">Tabak Zubehör</option>
+        <option value="Sonstiges">Sonstiges</option>
+      </select>
+      <select id="itemStore" required>
+        <option value="" disabled selected>Laden wählen</option>
+        <option value="Best">Best</option>
+        <option value="Rewe">Rewe</option>
+        <option value="Edeka">Edeka</option>
+        <option value="Lidl">Lidl</option>
+        <option value="Aldi">Aldi</option>
+        <option value="Netto">Netto</option>
+        <option value="Kaufland">Kaufland</option>
+        <option value="Penny">Penny</option>
+        <option value="Cultimo">Cultimo</option>
+        <option value="Sonstiges">Sonstiges</option>
+      </select>
+      <button type="submit">➕ Hinzufügen</button>
+    </form>
+
+    <button id="clearAllBtn">🧹 Alle löschen</button>
+    <div id="itemList"></div>
+  </div>
+
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-
-  <!-- Firebase Konfiguration -->
   <script src="firebase-config.js"></script>
-
-  <style>
-    body {
-  font-family: system-ui, sans-serif;
-  margin: 1rem;
-  padding: 0;
-  background: #f2f2f2;
-  color: #222;
-  max-width: 600px;
-  margin-inline: auto;
-}
-
-h1 {
-  text-align: center;
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-#userInfo {
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-}
-
-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-input[type="text"],
-select {
-  flex: 1 1 100%;
-  padding: 0.75rem;
-  font-size: 1rem;
-}
-
-button {
-  padding: 0.75rem 1rem;
-  font-size: 1rem;
-  background-color: #007bff;
-  border: none;
-  border-radius: 0.4rem;
-  color: white;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-
-ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-li {
-  background: white;
-  margin-bottom: 0.5rem;
-  padding: 0.75rem;
-  border-radius: 0.4rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid #ccc;
-}
-
-li.checked span {
-  text-decoration: line-through;
-  color: #888;
-}
-
-h2 {
-  font-size: 1.1rem;
-  margin-top: 1.5rem;
-  color: #333;
-}
-
-#loginBtn, #logoutBtn, #clearAllBtn {
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #1c1c1c;
-    color: #eee;
-  }
-
-  li {
-    background: #2a2a2a;
-    border-color: #444;
-  }
-
-  button {
-    background-color: #4a90e2;
-  }
-
-  button:hover {
-    background-color: #256acb;
-  }
-}
-
-/* Hamburger Button */
-#sidebarToggle {
-  position: fixed;
-  top: 1rem;
-  left: 1rem; /* NICHT 0! Damit es nicht mit System-Edge kollidiert */
-  font-size: 1.5rem;
-  cursor: pointer;
-  z-index: 999;
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-  color: inherit;
-  touch-action: manipulation; /* verhindert Long-Press & Browser-Gesten */
-}
-
-
-#sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 250px;
-  height: 100%;
-  background-color: #2b2b2b;
-  color: #fff;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.3);
-  padding: 1rem;
-  display: none;
-  flex-direction: column;
-  z-index: 150;
-  transition: transform 0.3s ease;
-}
-
-#sidebar.active {
-  display: flex;
-}
-
-
-
-#sidebar button {
-  display: block;
-  width: 100%;
-  margin-top: 1rem;
-  background: #dc3545;
-  color: white;
-  padding: 0.5rem;
-  border: none;
-  border-radius: 5px;
-}
-
-/* Sidebar-Standard (heller Modus) */
-#sidebar {
-  position: fixed;
-  top: 0;
-  left: -250px;
-  width: 250px;
-  height: 100%;
-  background-color: #f8f9fa;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.3);
-  padding: 1rem;
-  transition: left 0.3s ease-in-out;
-  z-index: 150;
-  color: #222;
-}
-
-#sidebar.active {
-  left: 0;
-}
-
-#sidebarToggle {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  font-size: 1.5rem;
-  cursor: pointer;
-  z-index: 200;
-  background: transparent;
-  border: none;
-}
-
-#sidebar button {
-  display: block;
-  width: 100%;
-  margin-top: 1rem;
-  background: #dc3545;
-  color: white;
-  padding: 0.5rem;
-  border: none;
-  border-radius: 5px;
-}
-
-/* Dark Mode Styles */
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #1e1e1e;
-    color: #eee;
-  }
-
-  #sidebar {
-    background-color: #2b2b2b;
-    color: #ddd;
-    box-shadow: 2px 0 5px rgba(255,255,255,0.1);
-  }
-
-  #sidebar button {
-    background-color: #b52d3b;
-  }
-
-  #sidebarToggle {
-    color: white;
-  }
-
-  li {
-    background-color: #2a2a2a;
-    border-color: #444;
-  }
-}
-
-
-  </style>
-</head>
-<body>
-  <div id="sidebarToggle">☰</div>
-<aside id="sidebar">
-  <div id="userInfo">👤 Nicht eingeloggt</div>
-  <button id="logoutBtn" style="display: none;">🚪 Abmelden</button>
-</aside>
-
-  <button id="loginBtn">🔐 Mit Google anmelden</button>
-  <button id="logoutBtn" style="display: none;">🚪 Abmelden</button>
-
-  <div id="userInfo" style="position: absolute; top: 10px; left: 10px; font-weight: bold;"></div>
-
-  <h1>🛒 Gemeinsame Einkaufsliste</h1>
-
-  <form id="itemForm">
-    <input type="text" id="itemInput" placeholder="Produkt eingeben" required />
-    <select id="itemCategory" required>
-      <option value="" disabled selected>Kategorie wählen</option>
-      <option value="Obst">Obst</option>
-      <option value="Getränke">Getränke</option>
-      <option value="Haushalt">Haushalt</option>
-      <option value="Snacks">Snacks</option>
-      <option value="Tiefkühl">Tiefkühl</option>
-      <option value="Tabakwaren">Tabakwaren</option>
-      <option value="Sonstiges">Sonstiges</option>
-    </select>
-    <button type="submit">➕ Hinzufügen</button>
-  </form>
-
-  <button id="clearAllBtn">🧹 Alle löschen</button>
-
-  <div id="itemList"></div>
-
   <script src="app.js"></script>
 </body>
 </html>

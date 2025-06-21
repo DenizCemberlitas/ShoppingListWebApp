@@ -1,27 +1,33 @@
+
 document.addEventListener("DOMContentLoaded", () => {
   const loginBtn = document.getElementById("loginBtn");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const userInfo = document.getElementById("userInfo");
   const form = document.getElementById("itemForm");
   const input = document.getElementById("itemInput");
   const categorySelect = document.getElementById("itemCategory");
+  const storeSelect = document.getElementById("itemStore");
   const list = document.getElementById("itemList");
   const clearBtn = document.getElementById("clearAllBtn");
-  const sidebarToggle = document.getElementById("sidebarToggle");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const userInfo = document.getElementById("userInfo");
+  const toggleSidebar = document.getElementById("toggleSidebar");
   const sidebar = document.getElementById("sidebar");
-
-sidebarToggle.addEventListener("click", () => {
-  sidebar.classList.toggle("active");
-});
 
   let items = [];
   let initialized = false;
-  let firestoreListRef = null;
 
-  // 🔁 Auth-Zustand prüfen
+  toggleSidebar.addEventListener("click", () => {
+    sidebar.classList.toggle("open");
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    firebase.auth().signOut().then(() => {
+      list.innerHTML = "";
+    }).catch((error) => {
+      console.error("Fehler beim Logout:", error);
+    });
+  });
+
   firebase.auth().onAuthStateChanged(user => {
-    initialized = false;
-
     if (user) {
       loginBtn.style.display = "none";
       logoutBtn.style.display = "inline-block";
@@ -35,141 +41,122 @@ sidebarToggle.addEventListener("click", () => {
     }
   });
 
-  // 🔐 Login mit Google
   loginBtn.addEventListener("click", () => {
     const provider = new firebase.auth.GoogleAuthProvider();
-
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
       .then(() => firebase.auth().signInWithPopup(provider))
-      .catch((error) => {
+      .then(() => {
+        loginBtn.style.display = "none";
+        initSharedList();
+      })
+      .catch(error => {
         console.error("Login fehlgeschlagen:", error);
         alert("Login fehlgeschlagen: " + error.message);
       });
   });
 
-  // 🚪 Logout
-  logoutBtn.addEventListener("click", () => {
-    firebase.auth().signOut()
-      .then(() => {
-        list.innerHTML = "";
-      })
-      .catch((error) => {
-        console.error("Fehler beim Logout:", error);
-      });
-  });
-
-  // 📥 Formularverhalten
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
-    const category = categorySelect.value;
-
-    if (text && category && firestoreListRef) {
-      firestoreListRef.add({
-        text,
-        category,
-        checked: false,
-        timestamp: Date.now()
-      });
-      input.value = "";
-      categorySelect.value = "";
-    }
-  });
-
-  // 🗑️ Alles löschen
-  clearBtn.addEventListener("click", () => {
-    if (firestoreListRef && confirm("Wirklich alles löschen?")) {
-      items.forEach(item => {
-        firestoreListRef.doc(item.id).delete();
-      });
-    }
-  });
-
-  // 📡 Firestore-Daten laden
   function initSharedList() {
     if (initialized) return;
     initialized = true;
 
-    firestoreListRef = firebase.firestore()
+    const listRef = firebase.firestore()
       .collection("lists")
       .doc("familie")
       .collection("items");
 
-    firestoreListRef.orderBy("timestamp").onSnapshot(snapshot => {
+    listRef.orderBy("timestamp").onSnapshot(snapshot => {
       items = [];
-
       snapshot.forEach(doc => {
         items.push({ ...doc.data(), id: doc.id });
       });
+      renderItems(listRef);
+    });
 
-      console.log("📦 Geladene Items:", items);
-      renderItems();
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      const category = categorySelect.value;
+      const store = storeSelect.value;
+      if (text && category && store) {
+        listRef.add({
+          text,
+          category,
+          store,
+          checked: false,
+          timestamp: Date.now()
+        });
+        input.value = "";
+        categorySelect.value = "";
+        storeSelect.value = "";
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      if (confirm("Wirklich alles löschen?")) {
+        items.forEach(item => {
+          listRef.doc(item.id).delete();
+        });
+      }
     });
   }
 
-  // 🖼️ Liste anzeigen
-  function renderItems() {
+  function renderItems(listRef) {
     list.innerHTML = "";
 
     const grouped = {};
     items.forEach(item => {
-      if (!grouped[item.category]) grouped[item.category] = [];
-      grouped[item.category].push(item);
+      if (!grouped[item.store]) grouped[item.store] = {};
+      if (!grouped[item.store][item.category]) grouped[item.store][item.category] = [];
+      grouped[item.store][item.category].push(item);
     });
 
-    Object.keys(grouped).forEach(category => {
-      const categoryHeader = document.createElement("h2");
-      categoryHeader.textContent = getCategoryEmoji(category) + " " + category;
-      list.appendChild(categoryHeader);
+    Object.keys(grouped).forEach(store => {
+      const storeHeader = document.createElement("h2");
+      storeHeader.textContent = "🏬 " + store;
+      list.appendChild(storeHeader);
 
-      const ul = document.createElement("ul");
+      const categories = grouped[store];
+      Object.keys(categories).forEach(category => {
+        const categoryHeader = document.createElement("h3");
+        categoryHeader.textContent = getCategoryEmoji(category) + " " + category;
+        list.appendChild(categoryHeader);
 
-      grouped[category].forEach(item => {
-        const li = document.createElement("li");
-        if (item.checked) li.classList.add("checked");
+        const ul = document.createElement("ul");
 
-        const span = document.createElement("span");
-        span.textContent = item.text;
-        span.addEventListener("click", () => {
-          firestoreListRef.doc(item.id).update({ checked: !item.checked });
+        categories[category].forEach(item => {
+          const li = document.createElement("li");
+          if (item.checked) li.classList.add("checked");
+
+          const span = document.createElement("span");
+          span.textContent = item.text;
+          span.addEventListener("click", () => {
+            listRef.doc(item.id).update({ checked: !item.checked });
+          });
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.textContent = "❌";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            listRef.doc(item.id).delete();
+          });
+
+          li.appendChild(span);
+          li.appendChild(deleteBtn);
+          ul.appendChild(li);
         });
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.textContent = "❌";
-        deleteBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          firestoreListRef.doc(item.id).delete();
-        });
-
-        li.appendChild(span);
-        li.appendChild(deleteBtn);
-        ul.appendChild(li);
+        list.appendChild(ul);
       });
-
-      list.appendChild(ul);
     });
   }
 
-  document.addEventListener("click", (e) => {
-  if (
-    sidebar.classList.contains("active") &&
-    !sidebar.contains(e.target) &&
-    e.target !== sidebarToggle
-  ) {
-    sidebar.classList.remove("active");
-  }
-});
-
-
-  // 🧠 Emoji je Kategorie
   function getCategoryEmoji(category) {
     switch (category) {
-      case "Obst": return "🍎";
       case "Getränke": return "🥤";
-      case "Haushalt": return "🧼";
       case "Snacks": return "🥨";
       case "Tiefkühl": return "🧊";
       case "Tabakwaren": return "🚬";
+      case "Tabak Zubehör": return "🚬";
       case "Sonstiges": return "🧺";
       default: return "🛒";
     }

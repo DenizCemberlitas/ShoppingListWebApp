@@ -138,3 +138,27 @@ li.checked span {
     flex-direction: column;
   }
 }
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  align-self: flex-end;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  color: #f44336;
+}
+
+/* 🖱️ Mach Listeneinträge sichtbar als verschiebbar */
+li[draggable="true"] {
+  cursor: grab;
+}
+
+/* 🟢 Visuelles Feedback beim Ziehen über ein Ziel */
+li.drag-over {
+  border-top: 2px solid #4caf50;
+}
+

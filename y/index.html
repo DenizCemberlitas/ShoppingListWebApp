@@ -9,6 +9,7 @@
 </head>
 <body>
   <div class="sidebar" id="sidebar">
+    <button id="closeSidebar" class="close-btn">❌</button>
     <div id="userInfo"></div>
     <button id="loginBtn">🔒 Mit Google anmelden</button>
     <button id="logoutBtn" style="display: none;">🚪 Logout</button>
@@ -25,9 +26,11 @@
       <select id="itemCategory" required>
         <option value="" disabled selected>Kategorie wählen</option>
         <option value="Getränke">Getränke</option>
+        <option value="Bier">Bier</option>
         <option value="Snacks">Snacks</option>
         <option value="Tabakwaren">Tabakwaren</option>
         <option value="Tabak Zubehör">Tabak Zubehör</option>
+        <option value="Spirituosen">Spirituosen</option>
         <option value="Sonstiges">Sonstiges</option>
       </select>
       <select id="itemStore" required>
@@ -41,6 +44,7 @@
         <option value="Kaufland">Kaufland</option>
         <option value="Penny">Penny</option>
         <option value="Cultimo">Cultimo</option>
+        <option value="TAM Tabakwaren">TAM Tabakwaren</option>
         <option value="Sonstiges">Sonstiges</option>
       </select>
       <button type="submit">➕ Hinzufügen</button>

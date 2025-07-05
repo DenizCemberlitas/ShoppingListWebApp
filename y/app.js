@@ -11,12 +11,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const userInfo = document.getElementById("userInfo");
   const toggleSidebar = document.getElementById("toggleSidebar");
   const sidebar = document.getElementById("sidebar");
+  const closeSidebar = document.getElementById("closeSidebar");
 
   let items = [];
   let initialized = false;
 
   toggleSidebar.addEventListener("click", () => {
     sidebar.classList.toggle("open");
+  });
+
+  closeSidebar.addEventListener("click", () => {
+    sidebar.classList.remove("open");
   });
 
   logoutBtn.addEventListener("click", () => {
@@ -64,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .doc("familie")
       .collection("items");
 
-    listRef.orderBy("timestamp").onSnapshot(snapshot => {
+    listRef.orderBy("order").onSnapshot(snapshot => {
       items = [];
       snapshot.forEach(doc => {
         items.push({ ...doc.data(), id: doc.id });
@@ -83,7 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
           category,
           store,
           checked: false,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          order: Date.now()
         });
         input.value = "";
         categorySelect.value = "";
@@ -113,10 +119,31 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.keys(grouped).forEach(store => {
       const storeHeader = document.createElement("h2");
       storeHeader.textContent = "🏬 " + store;
-      list.appendChild(storeHeader);
+
+      // 🧹 Button zum Löschen aller Items für diesen Store
+      const deleteStoreBtn = document.createElement("button");
+      deleteStoreBtn.textContent = "🗑️ Ladenliste löschen";
+      deleteStoreBtn.style.marginLeft = "1rem";
+      deleteStoreBtn.addEventListener("click", () => {
+        if (confirm(`Alle Produkte aus "${store}" wirklich löschen?`)) {
+          const toDelete = items.filter(item => item.store === store);
+          toDelete.forEach(item => {
+            listRef.doc(item.id).delete();
+          });
+        }
+      });
+
+      // Store-Header + Button zusammen
+      const storeHeaderWrapper = document.createElement("div");
+      storeHeaderWrapper.style.display = "flex";
+      storeHeaderWrapper.style.alignItems = "center";
+      storeHeaderWrapper.appendChild(storeHeader);
+      storeHeaderWrapper.appendChild(deleteStoreBtn);
+      list.appendChild(storeHeaderWrapper);
+
 
       const categories = grouped[store];
-      Object.keys(categories).forEach(category => {
+      Object.keys(categories).sort((a, b) => (a.order || 0) - (b.order || 0)).forEach(category => {
         const categoryHeader = document.createElement("h3");
         categoryHeader.textContent = getCategoryEmoji(category) + " " + category;
         list.appendChild(categoryHeader);
@@ -126,6 +153,77 @@ document.addEventListener("DOMContentLoaded", () => {
         categories[category].forEach(item => {
           const li = document.createElement("li");
           if (item.checked) li.classList.add("checked");
+
+          li.setAttribute("draggable", "true");
+          li.dataset.itemId = item.id;
+
+          // 👉 Drag-Start: Item-ID merken
+          li.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", item.id);
+          });
+
+          // 👉 Drop-Ziel: Einfügen + Order aktualisieren
+          li.addEventListener("dragover", (e) => {
+            e.preventDefault(); // notwendig für Drop
+            li.classList.add("drag-over");
+          });
+
+          li.addEventListener("dragleave", () => {
+            li.classList.remove("drag-over");
+          });
+
+          li.addEventListener("drop", async (e) => {
+            e.preventDefault();
+            li.classList.remove("drag-over");
+
+            const draggedId = e.dataTransfer.getData("text/plain");
+            const draggedIndex = categories[category].findIndex(i => i.id === draggedId);
+            const targetIndex = categories[category].findIndex(i => i.id === item.id);
+            if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) return;
+
+            const movedItem = categories[category].splice(draggedIndex, 1)[0];
+            categories[category].splice(targetIndex, 0, movedItem);
+
+            // 🧠 Reihenfolge aktualisieren und auf Firestore speichern (WICHTIG: async!)
+            const updates = categories[category].map((itm, idx) =>
+              listRef.doc(itm.id).update({ order: idx })
+            );
+
+            try {
+              await Promise.all(updates); // 🧘 Erst speichern…
+            } catch (error) {
+              console.error("Fehler beim Aktualisieren der Reihenfolge:", error);
+            }
+
+            // 💡 NICHT manuell rendern – Firestore ruft onSnapshot() von selbst auf
+          });
+
+
+
+
+          li.addEventListener("drop", (e) => {
+            e.preventDefault();
+            li.style.borderTop = "";
+
+            const draggedId = e.dataTransfer.getData("text/plain");
+
+            // 🔁 Neue Reihenfolge innerhalb dieser Kategorie berechnen
+            const draggedIndex = categories[category].findIndex(i => i.id === draggedId);
+            const targetIndex = categories[category].findIndex(i => i.id === item.id);
+            if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) return;
+
+            // 🧮 Items neu anordnen
+            const movedItem = categories[category].splice(draggedIndex, 1)[0];
+            categories[category].splice(targetIndex, 0, movedItem);
+
+            // 🔃 Neue Reihenfolge in Firestore speichern
+            categories[category].forEach((itm, idx) => {
+              listRef.doc(itm.id).update({ order: idx });
+            });
+
+            // 🔁 Neu rendern
+            renderItems(listRef);
+          });
 
           const span = document.createElement("span");
           span.textContent = item.text;
@@ -153,10 +251,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function getCategoryEmoji(category) {
     switch (category) {
       case "Getränke": return "🥤";
+      case "Bier": return "🍺";
       case "Snacks": return "🥨";
       case "Tiefkühl": return "🧊";
       case "Tabakwaren": return "🚬";
       case "Tabak Zubehör": return "🚬";
+      case "Spirituosen": return "🍾";
       case "Sonstiges": return "🧺";
       default: return "🛒";
     }
